@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "804480431087",
+    "project_id": "gtu-kuzgun",
+    "storage_bucket": "gtu-kuzgun.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:804480431087:android:af6a3c313eef2f6cb4bc1a",
+        "android_client_info": {
+          "package_name": "com.gtukuzgun.gtukuzgun"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCH3bF65NY4oSiYZ5fRwXG-xvxcX6-qEng"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:804480431087:android:a6ef29366055b44ab4bc1a",
+        "android_client_info": {
+          "package_name": "com.kuzgun.gtukuzgun"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCH3bF65NY4oSiYZ5fRwXG-xvxcX6-qEng"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
