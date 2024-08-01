@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:permission_handler/permission_handler.dart';
-
-import 'drone_detail.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LocationPage extends StatefulWidget {
   @override
@@ -17,6 +16,9 @@ class _LocationPageState extends State<LocationPage> {
   late Future<Position> _currentPosition;
   List<DocumentSnapshot> _droneList = [];
   DocumentSnapshot? _selectedDrone;
+  String? _selectedCarPlate;
+  List<String> _carPlates = [];
+  bool _loadingCarPlates = false;
 
   @override
   void initState() {
@@ -47,12 +49,12 @@ class _LocationPageState extends State<LocationPage> {
 
     double lat = position.latitude;
     double lng = position.longitude;
-    double radius = 0.1;
-    double maxDistance = 5.0;
+    double maxDistance = 20.0;
 
     QuerySnapshot snapshot = await FirebaseFirestore.instance
         .collection('drones')
         .where('available', isEqualTo: true)
+        .where('status', isEqualTo: 'base')
         .get();
 
     List<DocumentSnapshot> nearbyDrones = [];
@@ -89,6 +91,13 @@ class _LocationPageState extends State<LocationPage> {
     return deg * pi / 180;
   }
 
+  String _calculateArrivalTime(double distance) {
+    const double speedKmH = 20.0; // Drone speed in km/h
+    double timeHours = distance / speedKmH; // Time in hours
+    int minutes = (timeHours * 60).round(); // Convert hours to minutes
+    return '$minutes dakika';
+  }
+
   void _selectDrone(DocumentSnapshot drone) {
     setState(() {
       if (_selectedDrone == drone) {
@@ -98,6 +107,132 @@ class _LocationPageState extends State<LocationPage> {
       }
     });
   }
+
+  void _processOrder() async {
+    if (_selectedDrone != null) {
+      await _fetchCarPlates(); // Fetch car plates before showing the confirmation dialog
+
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          String? _selectedCarPlate = _carPlates.isNotEmpty ? _carPlates[0] : null;
+
+          return StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return AlertDialog(
+                title: Text('Sipariş Onayı'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Drone ID: ${_selectedDrone!.id} siparişini onaylıyor musunuz?'),
+                    if (_loadingCarPlates)
+                      CircularProgressIndicator()
+                    else
+                      DropdownButton<String>(
+                        value: _selectedCarPlate,
+                        hint: Text('Lütfen Araç Seçiniz'),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedCarPlate = newValue;
+                          });
+                        },
+                        items: _carPlates.map<DropdownMenuItem<String>>((String plate) {
+                          return DropdownMenuItem<String>(
+                            value: plate,
+                            child: Text(plate),
+                          );
+                        }).toList(),
+                      ),
+                  ],
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    child: Text('İptal'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                  TextButton(
+                    child: Text('Onayla'),
+                    onPressed: () async {
+                      Navigator.of(context).pop();
+                      if (_selectedCarPlate != null) {
+                        await _processOrderWithCarPlate(_selectedCarPlate!);
+                      }
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    }
+  }
+  Future<void> _fetchCarPlates() async {
+    setState(() {
+      _loadingCarPlates = true;
+    });
+
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        String userEmail = user.email ?? '';
+
+        // Query the users collection for the document where email matches the authenticated user's email
+        QuerySnapshot userSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .where('email', isEqualTo: userEmail)
+            .limit(1)
+            .get();
+
+        if (userSnapshot.docs.isNotEmpty) {
+          DocumentSnapshot userDoc = userSnapshot.docs.first;
+
+          List<dynamic> carPlates = userDoc['cars'] ?? [];
+          setState(() {
+            _carPlates = carPlates.map((plate) => plate.toString()).toList();
+            _selectedCarPlate = _carPlates.isNotEmpty ? _carPlates[0] : null;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching car plates: $e');
+      // TODO: Handle error (e.g., show an error message to the user)
+    } finally {
+      setState(() {
+        _loadingCarPlates = false;
+      });
+    }
+  }
+
+  Future<void> _processOrderWithCarPlate(String carPlate) async {
+    if (_selectedDrone != null) {
+      // Update drone availability
+      await FirebaseFirestore.instance
+          .collection('drones')
+          .doc(_selectedDrone!.id)
+          .update({'available': false});
+
+      // Add new order to 'orders' collection
+      await FirebaseFirestore.instance.collection('orders').add({
+        'droneName': _selectedDrone!['name'],
+        'droneId': _selectedDrone!.id,
+        'location': _selectedDrone!['location'],
+        'status': 'Approved',
+        'carPlate': carPlate, // Include the selected car plate
+      });
+
+      // Navigate to the tracking page
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TrackingPage(drone: _selectedDrone!),
+        ),
+      );
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +255,22 @@ class _LocationPageState extends State<LocationPage> {
             Position position = snapshot.data!;
             return Stack(
               children: [
+                Positioned.fill(
+                  child: Align(
+                    alignment: Alignment.center, // Align the image to the center
+                    child: FractionallySizedBox(
+                      widthFactor: 0.5, // Adjust these factors to scale the image size
+                      heightFactor: 0.5,
+                      child: Opacity(
+                        opacity: 0.1,
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.contain, // Use 'contain' to maintain aspect ratio
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 Positioned(
                   top: 16.0,
                   left: 16.0,
@@ -142,6 +293,13 @@ class _LocationPageState extends State<LocationPage> {
                       DocumentSnapshot drone = _droneList[index];
                       GeoPoint geoPoint = drone['location'];
                       bool isSelected = _selectedDrone == drone;
+                      double distance = _calculateDistance(
+                        position.latitude,
+                        position.longitude,
+                        geoPoint.latitude,
+                        geoPoint.longitude,
+                      );
+                      String arrivalTime = _calculateArrivalTime(distance);
                       return GestureDetector(
                         onTap: () {
                           _selectDrone(drone);
@@ -153,7 +311,10 @@ class _LocationPageState extends State<LocationPage> {
                           child: ListTile(
                             leading: Icon(Icons.airplane_ticket),
                             title: Text('Drone ID: ${drone.id}'),
-                            subtitle: Text('Latitude: ${geoPoint.latitude}, Longitude: ${geoPoint.longitude}'),
+                            subtitle: Text(
+                              'Latitude: ${geoPoint.latitude}, Longitude: ${geoPoint.longitude}\n'
+                                  'Tahmini varış süresi: $arrivalTime',
+                            ),
                           ),
                         ),
                       );
@@ -165,38 +326,11 @@ class _LocationPageState extends State<LocationPage> {
           }
         },
       ),
-      floatingActionButton: _selectedDrone!= null
+      floatingActionButton: _selectedDrone != null
           ? FloatingActionButton(
         child: Icon(Icons.check),
         onPressed: () {
-          // Process the selected drone
-          // For example, navigate to another page or show a confirmation dialog
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text('Drone Selected'),
-              content: Text('You have selected drone ID: ${_selectedDrone!.id}'),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context); // Cancel
-                  },
-                  child: Text('Hayır'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TrackingPage(drone: _selectedDrone!),
-                      ),
-                    );
-                  },
-                  child: Text('Evet'),
-                ),
-              ],
-            ),
-          );
+          _processOrder();
         },
       )
           : null,

@@ -8,8 +8,8 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _emailController = TextEditingController(text: 'sahinabdullah790@gmail.com');
+  final _passwordController = TextEditingController(text: '12345678');
 
   @override
   void dispose() {
@@ -25,7 +25,6 @@ class _LoginPageState extends State<LoginPage> {
           email: _emailController.text,
           password: _passwordController.text,
         );
-
         Navigator.pushReplacementNamed(context, '/location');
       } catch (e) {
         print('Error: $e');
@@ -99,9 +98,25 @@ class _LoginPageState extends State<LoginPage> {
                     ElevatedButton(
                       onPressed: _login,
                       style: ElevatedButton.styleFrom(
-                        foregroundColor: Colors.white, backgroundColor: Colors.indigo,
+                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.indigo,
                       ),
                       child: Text('Giriş Yap'),
+                    ),
+                    SizedBox(height: 16),
+                    Center(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/register');
+                        },
+                        child: Text(
+                          'Hesabınız yok mu? Hemen kaydolun!',
+                          style: TextStyle(
+                            color: Colors.indigo,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

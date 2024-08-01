@@ -13,7 +13,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
-  final _carPlateController = TextEditingController();
+  final List<TextEditingController> _carPlateControllers = [];
 
   @override
   void dispose() {
@@ -21,26 +21,53 @@ class _RegisterPageState extends State<RegisterPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _nameController.dispose();
-    _carPlateController.dispose();
+    _carPlateControllers.forEach((controller) => controller.dispose());
     super.dispose();
+  }
+
+  void _addCarPlateField() {
+    setState(() {
+      _carPlateControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeCarPlateField(int index) {
+    setState(() {
+      _carPlateControllers[index].dispose();
+      _carPlateControllers.removeAt(index);
+    });
   }
 
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
       try {
-        UserCredential userCredential =
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text,
           password: _passwordController.text,
         );
+
+        // Collect car plate values
+        List<String> carPlates = _carPlateControllers.map((controller) => controller.text).toList();
 
         // Add user info to Firestore
         await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
           'name': _nameController.text,
           'email': _emailController.text,
-          'carPlate': _carPlateController.text,
+          'cars': carPlates, // Store the list of car plates
         });
 
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Başarıyla kayıt oldunuz! Yönlendiriliyorsunuz...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Wait for the SnackBar to disappear before navigating
+        await Future.delayed(Duration(seconds: 2));
+
+        // Navigate to login page
         Navigator.pushReplacementNamed(context, '/login');
       } catch (e) {
         print('Error: $e');
@@ -161,19 +188,41 @@ class _RegisterPageState extends State<RegisterPage> {
                         },
                       ),
                       SizedBox(height: 16),
-                      TextFormField(
-                        controller: _carPlateController,
-                        decoration: InputDecoration(
-                          labelText: 'Araç Plakası',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.car_repair, color: Colors.indigo),
+                      ..._carPlateControllers.asMap().entries.map((entry) {
+                        int index = entry.key;
+                        TextEditingController controller = entry.value;
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: controller,
+                                decoration: InputDecoration(
+                                  labelText: 'Araç Plakası ${index + 1}',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.car_repair, color: Colors.indigo),
+                                ),
+                                validator: (value) {
+                                  if (value!.isEmpty) {
+                                    return 'Araç plakası gerekli';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.remove_circle, color: Colors.red),
+                              onPressed: () => _removeCarPlateField(index),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                      SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _addCarPlateField,
+                        child: Text('Yeni Araç Ekle'),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white, backgroundColor: Colors.indigo,
                         ),
-                        validator: (value) {
-                          if (value!.isEmpty) {
-                            return 'Araç plakası gerekli';
-                          }
-                          return null;
-                        },
                       ),
                       SizedBox(height: 24),
                       ElevatedButton(
