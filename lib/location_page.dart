@@ -175,7 +175,7 @@ class _LocationPageState extends State<LocationPage> {
             context: context,
             builder: (context) => AlertDialog(
               title: Text('Drone Selected'),
-              content: Text('You have selected drone ID: ${_selectedDrone!.id}'),
+              content: Text('Seçilen drone ID: ${_selectedDrone!.id}'),
               actions: [
                 TextButton(
                   onPressed: () {
